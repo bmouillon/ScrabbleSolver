@@ -37,6 +37,14 @@ impl Grid {
         }
     }
 
+    fn set_bonus(&mut self, case: Square, x: usize, y: usize) {
+        let n = GRID_SIZE - 1;
+        self.squares[x][y] = case;
+        self.squares[x][n - y] = case;
+        self.squares[n - x][y] = case;
+        self.squares[n - x][n - y] = case;
+    }
+
     pub fn generate_grid(&mut self) {
         let lcd_list = [(0, 3), (2, 6), (3, 0), (3, 7), (6, 2), (6, 6), (7, 3)];
         let lct_list = [(1, 5), (5, 1), (5, 5)];
@@ -65,12 +73,30 @@ impl Grid {
         }
     }
 
-    fn set_bonus(&mut self, case: Square, x: usize, y: usize) {
-        let n = GRID_SIZE - 1;
-        self.squares[x][y] = case;
-        self.squares[x][n - y] = case;
-        self.squares[n - x][y] = case;
-        self.squares[n - x][n - y] = case;
+    pub fn play(&mut self, word: &str, i: usize, j: usize, direction: usize, gaddag: GaddagNode) {
+        if direction == 0 {
+            // Horizontal play
+            for (k, c) in word.chars().enumerate() {
+                self.squares[i][j + k] = Square::Letter(c);
+            }
+        } else {
+            // Vertical play
+            for (k, c) in word.chars().enumerate() {
+                self.squares[i + k][j] = Square::Letter(c);
+            }
+        }
+        self.update_anchors();
+        self.update_crosswords(gaddag);
+    }
+
+    pub fn is_empty(&self, i: usize, j: usize) -> bool {
+        if i >= GRID_SIZE || j >= GRID_SIZE {
+            return true;
+        }
+        match self.squares[i][j] {
+            Square::Letter(_) => false,
+            _ => true,
+        }
     }
 
     pub fn update_anchors(&mut self) {
@@ -88,16 +114,6 @@ impl Grid {
         }
         if self.anchors.iter().all(|row| row.iter().all(|&a| !a)) {
             self.anchors[7][7] = true; // Activer l'ancre au centre si la grille est vide
-        }
-    }
-
-    pub fn is_empty(&self, i: usize, j: usize) -> bool {
-        if i >= GRID_SIZE || j >= GRID_SIZE {
-            return true;
-        }
-        match self.squares[i][j] {
-            Square::Letter(_) => false,
-            _ => true,
         }
     }
 
