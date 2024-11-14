@@ -9,6 +9,7 @@ use grid::Square;
 fn main() -> io::Result<()> {
     let root = Gaddag::read_words_from_file("ODS9.txt");
     let mut grid = Grid::new();
+    Grid::generate_grid(&mut grid);
 
     grid.squares[7][3] = Square::Letter('G');
     grid.squares[7][4] = Square::Letter('U');
