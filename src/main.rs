@@ -2,12 +2,17 @@ use std::io;
 
 mod gaddag;
 use gaddag::Gaddag;
+
 mod grid;
 use grid::Grid;
 use grid::Square;
 
+mod solver;
+
+mod constants;
+
 fn main() -> io::Result<()> {
-    let root = Gaddag::read_words_from_file("ODS9.txt");
+    let gaddag = Gaddag::read_words_from_file("ODS9.txt");
     let mut grid = Grid::new();
     Grid::generate_grid(&mut grid);
 
@@ -35,7 +40,7 @@ fn main() -> io::Result<()> {
     grid.squares[5][5] = Square::Letter('I');
 
     grid.update_anchors();
-    grid.update_crosswords(root);
+    grid.update_crosswords(gaddag);
     println!("{}", grid);
 
     // // Vérifier si la string "UOF!DRE" est dans le GADDAG
