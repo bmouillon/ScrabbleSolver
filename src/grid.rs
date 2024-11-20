@@ -1,16 +1,14 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::hash::Hash;
 use std::rc::Rc;
 
 use crate::gaddag::{Gaddag, GaddagNode};
 
-pub const GRID_SIZE: usize = 15;
-pub const ALPHABET: [char; 26] = [
-    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
-    'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-];
+use crate::constants::{ALPHABET, BONUS_CELLS, GRID_SIZE, LETTERS_VALUE};
 
 #[derive(Debug, Clone, Copy)]
+
 pub enum Square {
     Blank,
     LCD,
@@ -24,8 +22,8 @@ pub enum Square {
 
 pub struct Grid {
     pub squares: [[Square; GRID_SIZE]; GRID_SIZE],
-    anchors: [[bool; GRID_SIZE]; GRID_SIZE],
-    crosswords: [[Option<HashMap<char, i32>>; GRID_SIZE]; GRID_SIZE],
+    pub anchors: [[bool; GRID_SIZE]; GRID_SIZE],
+    pub crosswords: [[Option<HashMap<char, i32>>; GRID_SIZE]; GRID_SIZE],
 }
 
 impl Grid {
@@ -37,39 +35,51 @@ impl Grid {
         }
     }
 
-    fn set_bonus(&mut self, case: Square, x: usize, y: usize) {
+    // pub fn get_letter(&self, row: usize, col: usize) -> Option<char> {
+    //     match self.squares[row][col] {
+    //         Square::Letter(c) => Some(c),
+    //         _ => None,
+    //     }
+    // }
+
+    fn set_bonus(&mut self, bonus: Square, idx_list: &[(usize, usize)]) {
         let n = GRID_SIZE - 1;
-        self.squares[x][y] = case;
-        self.squares[x][n - y] = case;
-        self.squares[n - x][y] = case;
-        self.squares[n - x][n - y] = case;
+        for (x, y) in idx_list {
+            self.squares[*x][*y] = bonus;
+            self.squares[*x][n - *y] = bonus;
+            self.squares[n - *x][*y] = bonus;
+            self.squares[n - *x][n - *y] = bonus;
+        }
     }
 
     pub fn generate_grid(&mut self) {
-        let lcd_list = [(0, 3), (2, 6), (3, 0), (3, 7), (6, 2), (6, 6), (7, 3)];
-        let lct_list = [(1, 5), (5, 1), (5, 5)];
-        let lcq_list: [(usize, usize); 0] = [];
-        let mcd_list = [(1, 1), (2, 2), (3, 3), (4, 4)];
-        let mct_list = [(0, 0), (0, 7), (7, 0)];
-        let mcq_list: [(usize, usize); 0] = [];
+        // Place les cases bonus sur la grille
+        let bonuses = [
+            ("LCD", Square::LCD),
+            ("LCT", Square::LCT),
+            ("LCQ", Square::LCQ),
+            ("MCD", Square::MCD),
+            ("MCT", Square::MCT),
+            ("MCQ", Square::MCQ),
+        ];
 
-        for &(x, y) in &lcd_list {
-            self.set_bonus(Square::LCD, x, y);
+        for (str_bonus, bonus) in bonuses {
+            if let Some(idx_list) = BONUS_CELLS.get(str_bonus) {
+                self.set_bonus(bonus, idx_list);
+            }
         }
-        for &(x, y) in &lct_list {
-            self.set_bonus(Square::LCT, x, y);
-        }
-        for &(x, y) in &lcq_list {
-            self.set_bonus(Square::LCQ, x, y);
-        }
-        for &(x, y) in &mcd_list {
-            self.set_bonus(Square::MCD, x, y);
-        }
-        for &(x, y) in &mct_list {
-            self.set_bonus(Square::MCT, x, y);
-        }
-        for &(x, y) in &mcq_list {
-            self.set_bonus(Square::MCQ, x, y);
+    }
+
+    fn get_square_multiplier(&self, x: usize, y: usize) -> (i32, i32) {
+        match self.squares[x][y] {
+            Square::Blank => (1, 1),
+            Square::LCD => (2, 1),
+            Square::LCT => (3, 1),
+            Square::LCQ => (4, 1),
+            Square::MCD => (1, 2),
+            Square::MCT => (1, 3),
+            Square::MCQ => (1, 4),
+            _ => (1, 1),
         }
     }
 
@@ -102,7 +112,6 @@ impl Grid {
     pub fn update_anchors(&mut self) {
         for i in 0..GRID_SIZE {
             for j in 0..GRID_SIZE {
-                self.anchors[i][j] = false;
                 if self.is_empty(i, j) {
                     let b1 = self.is_empty(i.wrapping_sub(1), j);
                     let b2 = self.is_empty(i + 1, j);
@@ -117,46 +126,59 @@ impl Grid {
         }
     }
 
+    fn adj(&self, x: usize, y: usize) -> (String, String, i32) {
+        // Récupère les mots au dessus et en dessous de la case actuelle
+        let mut up_letters = String::new();
+        let mut down_letters = String::new();
+        let mut score = 0;
+
+        // Parcours vers le haut
+        let mut i = x;
+        while i > 0 {
+            i -= 1;
+            if let Square::Letter(c) = self.squares[i][y] {
+                score += *LETTERS_VALUE.get(&c).unwrap_or(&0);
+                up_letters.push(c);
+            } else {
+                break;
+            }
+        }
+
+        // Parcours vers le bas
+        i = x;
+        while i < 14 {
+            i += 1;
+            if let Square::Letter(c) = self.squares[i][y] {
+                score += *LETTERS_VALUE.get(&c).unwrap_or(&0);
+                down_letters.push(c);
+            } else {
+                break;
+            }
+        }
+
+        (up_letters, down_letters, score)
+    }
+
     pub fn update_crosswords(&mut self, gaddag: GaddagNode) {
-        let adj = |x: usize, y: usize| {
-            let mut up_letters = String::new();
-            let mut down_letters = String::new();
-
-            let mut i = x;
-            while i > 0 {
-                i -= 1;
-                let c = self.squares[i][y];
-                if let Square::Letter(letter) = c {
-                    up_letters.push(letter);
-                } else {
-                    break;
-                }
-            }
-
-            i = x;
-            while i < GRID_SIZE - 1 {
-                i += 1;
-                let c = self.squares[i][y];
-                if let Square::Letter(letter) = c {
-                    down_letters.push(letter);
-                } else {
-                    break;
-                }
-            }
-
-            (up_letters, down_letters)
-        };
-
         for x in 0..GRID_SIZE {
             for y in 0..GRID_SIZE {
                 self.crosswords[x][y] = None;
                 if self.anchors[x][y] {
-                    let (up_letters, down_letters) = adj(x, y);
-                    for &c in &ALPHABET {
-                        let word = format!("{}{}!{}", c, up_letters, down_letters);
-                        if Gaddag::contains_word(&word, Rc::clone(&gaddag)) {
-                            let entry = self.crosswords[x][y].get_or_insert_with(HashMap::new);
-                            entry.insert(c, 0);
+                    let (up_letters, down_letters, score) = self.adj(x, y);
+                    // On regarde s'il y a des lettres en haut ou en bas de la case
+                    if up_letters != "" || down_letters != "" {
+                        self.crosswords[x][y] = Some(HashMap::new());
+                        for &c in &ALPHABET {
+                            let word = format!("{}{}!{}", c, up_letters, down_letters);
+                            if Gaddag::contains_word(&word, Rc::clone(&gaddag)) {
+                                // Calcul du score de la lettre et de la case
+                                let (flat, mult) = self.get_square_multiplier(x, y);
+                                let letter_score = *LETTERS_VALUE.get(&c).unwrap_or(&0);
+                                let cw_score = (letter_score * flat + score) * mult;
+                                // Insertion de la lettre et du score dans la table
+                                let entry = self.crosswords[x][y].get_or_insert_with(HashMap::new);
+                                entry.insert(c, cw_score);
+                            }
                         }
                     }
                 }
