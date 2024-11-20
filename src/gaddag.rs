@@ -9,8 +9,8 @@ pub type GaddagNode = Rc<RefCell<Gaddag>>;
 
 #[derive(Debug)]
 pub struct Gaddag {
-    is_word: bool,
-    children: HashMap<char, GaddagNode>,
+    pub is_word: bool,
+    pub children: HashMap<char, GaddagNode>,
 }
 
 impl Gaddag {
