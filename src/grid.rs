@@ -1,11 +1,9 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::hash::Hash;
 use std::rc::Rc;
 
-use crate::gaddag::{Gaddag, GaddagNode};
-
 use crate::constants::{ALPHABET, BONUS_CELLS, GRID_SIZE, LETTERS_VALUE};
+use crate::gaddag::{Gaddag, GaddagNode};
 
 #[derive(Debug, Clone, Copy)]
 
@@ -23,7 +21,7 @@ pub enum Square {
 pub struct Grid {
     pub squares: [[Square; GRID_SIZE]; GRID_SIZE],
     pub anchors: [[bool; GRID_SIZE]; GRID_SIZE],
-    pub crosswords: [[Option<HashMap<char, i32>>; GRID_SIZE]; GRID_SIZE],
+    pub crosswords: [[Option<HashMap<char, usize>>; GRID_SIZE]; GRID_SIZE],
 }
 
 impl Grid {
@@ -70,7 +68,7 @@ impl Grid {
         }
     }
 
-    fn get_square_multiplier(&self, x: usize, y: usize) -> (i32, i32) {
+    pub fn get_square_multiplier(&self, x: usize, y: usize) -> (usize, usize) {
         match self.squares[x][y] {
             Square::Blank => (1, 1),
             Square::LCD => (2, 1),
@@ -126,12 +124,11 @@ impl Grid {
         }
     }
 
-    fn adj(&self, x: usize, y: usize) -> (String, String, i32) {
+    fn adj(&self, x: usize, y: usize) -> (String, String, usize) {
         // Récupère les mots au dessus et en dessous de la case actuelle
         let mut up_letters = String::new();
         let mut down_letters = String::new();
         let mut score = 0;
-
         // Parcours vers le haut
         let mut i = x;
         while i > 0 {
@@ -143,7 +140,6 @@ impl Grid {
                 break;
             }
         }
-
         // Parcours vers le bas
         i = x;
         while i < 14 {
@@ -155,7 +151,6 @@ impl Grid {
                 break;
             }
         }
-
         (up_letters, down_letters, score)
     }
 
@@ -167,18 +162,25 @@ impl Grid {
                     let (up_letters, down_letters, score) = self.adj(x, y);
                     // On regarde s'il y a des lettres en haut ou en bas de la case
                     if up_letters != "" || down_letters != "" {
-                        self.crosswords[x][y] = Some(HashMap::new());
+                        let (flat, mult) = self.get_square_multiplier(x, y);
                         for &c in &ALPHABET {
                             let word = format!("{}{}!{}", c, up_letters, down_letters);
                             if Gaddag::contains_word(&word, Rc::clone(&gaddag)) {
-                                // Calcul du score de la lettre et de la case
-                                let (flat, mult) = self.get_square_multiplier(x, y);
+                                // Calcul du score du crossword
                                 let letter_score = *LETTERS_VALUE.get(&c).unwrap_or(&0);
                                 let cw_score = (letter_score * flat + score) * mult;
                                 // Insertion de la lettre et du score dans la table
                                 let entry = self.crosswords[x][y].get_or_insert_with(HashMap::new);
                                 entry.insert(c, cw_score);
                             }
+                        }
+                        if let Some(entry) = &mut self.crosswords[x][y] {
+                            // On doit insérer le joker si il existe au moins un crossword possible
+                            let jok_cw_score = score * mult;
+                            entry.insert('?', jok_cw_score);
+                        } else {
+                            // Sinon on doit initialiser avec une HashMap vide
+                            self.crosswords[x][y] = Some(HashMap::new());
                         }
                     }
                 }
