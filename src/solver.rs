@@ -1,8 +1,17 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::constants::LETTERS_VALUE;
 use crate::gaddag::{Gaddag, GaddagNode};
 use crate::grid::{Grid, Square};
+
+pub struct WordInfo {
+    pub position: (usize, usize),
+    pub rack: HashMap<char, usize>,
+    pub prefix: String,
+    pub score: (usize, usize, usize),
+    pub node: GaddagNode,
+}
 
 fn reduce_rack(rack: &HashMap<char, usize>, letter: char) -> HashMap<char, usize> {
     // Effectue une copie du rack avec une occurence de letter en moins
@@ -21,31 +30,19 @@ fn process_letter(
     i: usize,
     j: usize,
     grid: &Grid,
-    rack: &HashMap<char, usize>,
-    prefix: &str,
-    flat_score: usize,
-    multiplier: usize,
-    cw_score: usize,
-    node: &GaddagNode,
+    wordinfo: &WordInfo,
     letter: char,
     replacement: char,
-) -> Option<(
-    HashMap<char, usize>,
-    String,
-    usize,
-    usize,
-    usize,
-    GaddagNode,
-)> {
-    if let Some(next_node) = node.borrow().children.get(&replacement) {
+) -> Option<WordInfo> {
+    if let Some(next_node) = wordinfo.node.borrow().children.get(&replacement) {
         // Vérifie si on ne forme pas un crossword invalide
         if grid.crosswords[i][j]
             .as_ref()
             .map_or(true, |cw| cw.contains_key(&replacement))
         {
             // Génère la nouvelle rack et le nouveau prefix
-            let new_rack = reduce_rack(rack, letter);
-            let mut new_prefix = prefix.to_owned();
+            let new_rack = reduce_rack(&wordinfo.rack, letter);
+            let mut new_prefix = wordinfo.prefix.clone();
             new_prefix.push(if letter == '?' {
                 replacement.to_ascii_lowercase()
             } else {
@@ -54,74 +51,106 @@ fn process_letter(
             // Mise à jour des scores
             let (square_flat, square_mult) = grid.get_square_multiplier(i, j);
             let new_flat_score =
-                flat_score + LETTERS_VALUE.get(&replacement).unwrap_or(&0) * square_flat;
-            let new_multiplier = multiplier * square_mult;
+                wordinfo.score.0 + LETTERS_VALUE.get(&replacement).unwrap_or(&0) * square_flat;
+            let new_multiplier = wordinfo.score.1 * square_mult;
             // Calcul du nouveau score des crosswords
             let new_cw_score = if let Some(cw) = &grid.crosswords[i][j] {
                 if let Some(cw_value) = cw.get(&replacement) {
-                    cw_score + cw_value
+                    wordinfo.score.2 + cw_value
                 } else {
-                    cw_score
+                    wordinfo.score.2
                 }
             } else {
-                cw_score
+                wordinfo.score.2
             };
-            return Some((
-                new_rack,
-                new_prefix,
-                new_flat_score,
-                new_multiplier,
-                new_cw_score,
-                next_node.clone(),
-            ));
+            return Some(WordInfo {
+                position: wordinfo.position,
+                rack: new_rack,
+                prefix: new_prefix,
+                score: (new_flat_score, new_multiplier, new_cw_score),
+                node: Rc::clone(&next_node),
+            });
         }
     }
     None
 }
 
-fn step(
-    i: usize,
-    j: usize,
-    grid: Grid,
-    rack: &HashMap<char, usize>,
-    prefix: &str,
-    flat_score: usize,
-    multiplier: usize,
-    cw_score: usize,
-    node: &GaddagNode,
-) -> Vec<(
-    HashMap<char, usize>,
-    String,
-    usize,
-    usize,
-    usize,
-    GaddagNode,
-)> {
+fn step(i: usize, j: usize, grid: &Grid, wordinfo: &WordInfo) -> Vec<WordInfo> {
+    // Prend un WordInfo et effectue un pas
     let mut results = Vec::new();
-    for (&letter, _) in rack.iter() {
+    for (&letter, _) in wordinfo.rack.iter() {
         if letter == '?' {
             for replacement in 'A'..='Z' {
-                if let Some(result) = process_letter(
-                    i,
-                    j,
-                    &grid,
-                    rack,
-                    prefix,
-                    flat_score,
-                    multiplier,
-                    cw_score,
-                    node,
-                    letter,
-                    replacement,
-                ) {
+                if let Some(result) = process_letter(i, j, grid, wordinfo, letter, replacement) {
                     results.push(result);
                 }
             }
-        } else if let Some(result) = process_letter(
-            i, j, &grid, rack, prefix, flat_score, multiplier, cw_score, node, letter, letter,
-        ) {
+        } else if let Some(result) = process_letter(i, j, grid, wordinfo, letter, letter) {
             results.push(result);
         }
     }
     results
+}
+
+pub fn generate_left_parts(
+    i: usize,
+    j: usize,
+    grid: &Grid,
+    rack: &HashMap<char, usize>,
+    gaddag: &GaddagNode,
+) -> Vec<WordInfo> {
+    // Retourne l'ensemble des préfixes gauches à partir de (i, j)
+    // Vérification de la présence d'une lettre à gauche de l'ancre
+    if j == 0 {
+        return Vec::new(); // TO DO
+    } else if let Square::Letter(_) = grid.squares[i][j - 1] {
+        return Vec::new(); // TO DO
+    }
+    // Recherche de la place disponible à gauche de l'ancre
+    let mut left_limit = j;
+    while left_limit > 0 && grid.anchors[i][left_limit - 1] == false {
+        left_limit -= 1;
+    }
+    // Génération des préfixes
+    let mut all_results = Vec::new();
+    let mut current_prefixes = vec![WordInfo {
+        position: (i, j),
+        rack: rack.clone(),
+        prefix: String::new(),
+        score: (0, 1, 0),
+        node: Rc::clone(gaddag),
+    }];
+    let mut next_prefixes = Vec::new();
+    for k in (left_limit..=j).rev() {
+        for wordinfo in current_prefixes.drain(..) {
+            let results = step(i, k, grid, &wordinfo);
+            for result in results {
+                next_prefixes.push(result);
+            }
+            all_results.push(wordinfo);
+        }
+        current_prefixes = std::mem::take(&mut next_prefixes);
+    }
+    all_results.extend(current_prefixes);
+    all_results
+}
+
+pub fn filter_left_parts(results: Vec<WordInfo>) -> Vec<WordInfo> {
+    // Filtre les préfixes gauches obtenus en ne gardant que ceux qui peuvent être le début d'un mot
+    let mut filtered_results = Vec::new();
+    for wordinfo in results {
+        if let Some(bang_node) = wordinfo.node.borrow().children.get(&'!') {
+            // Renversement du préfixe
+            let reversed_prefix = wordinfo.prefix.chars().rev().collect();
+            // Ajout du résultat modifié à la liste filtrée
+            filtered_results.push(WordInfo {
+                position: wordinfo.position,
+                rack: wordinfo.rack,
+                prefix: reversed_prefix,
+                score: wordinfo.score,
+                node: Rc::clone(bang_node),
+            });
+        }
+    }
+    filtered_results
 }
