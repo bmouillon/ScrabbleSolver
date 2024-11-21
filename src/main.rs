@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io;
 
 mod gaddag;
@@ -8,6 +9,9 @@ use grid::Grid;
 use grid::Square;
 
 mod solver;
+use crate::solver::filter_left_parts;
+use crate::solver::generate_left_parts;
+use solver::WordInfo;
 
 mod constants;
 
@@ -40,8 +44,21 @@ fn main() -> io::Result<()> {
     grid.squares[5][5] = Square::Letter('I');
 
     grid.update_anchors();
-    grid.update_crosswords(gaddag);
+    grid.update_crosswords(&gaddag);
     println!("{}", grid);
+
+    let rack: HashMap<char, usize> = [('A', 2), ('F', 1), ('I', 1), ('L', 2), ('X', 1)]
+        .iter()
+        .cloned()
+        .collect();
+    let results = generate_left_parts(2, 5, &grid, &rack, &gaddag);
+    let filtered_results = filter_left_parts(results);
+    for wordinfo in filtered_results {
+        println!(
+            "Prefix: {}, Rack: {:?}, Flat Score: {}, Multiplier: {}, CW Score: {}",
+            wordinfo.prefix, wordinfo.rack, wordinfo.score.0, wordinfo.score.1, wordinfo.score.2
+        );
+    }
 
     // // Vérifier si la string "UOF!DRE" est dans le GADDAG
     // let word_to_check = "!FOUDRE";
