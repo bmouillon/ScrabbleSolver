@@ -8,7 +8,7 @@ pub const ALPHABET: [char; 26] = [
     'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 ];
 
-pub const LETTERS_VALUE: phf::Map<char, i32> = phf::phf_map! {
+pub const LETTERS_VALUE: phf::Map<char, usize> = phf::phf_map! {
     // Letters value
     'A' => 1, 'B' => 3, 'C' => 3, 'D' => 2, 'E' => 1, 'F' => 4,
     'G' => 2, 'H' => 4, 'I' => 1, 'J' => 8, 'K' => 10, 'L' => 1,
