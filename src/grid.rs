@@ -94,7 +94,7 @@ impl Grid {
             }
         }
         self.update_anchors();
-        self.update_crosswords(gaddag);
+        self.update_crosswords(&gaddag);
     }
 
     pub fn is_empty(&self, i: usize, j: usize) -> bool {
@@ -154,7 +154,7 @@ impl Grid {
         (up_letters, down_letters, score)
     }
 
-    pub fn update_crosswords(&mut self, gaddag: GaddagNode) {
+    pub fn update_crosswords(&mut self, gaddag: &GaddagNode) {
         for x in 0..GRID_SIZE {
             for y in 0..GRID_SIZE {
                 self.crosswords[x][y] = None;
