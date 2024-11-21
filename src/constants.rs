@@ -18,6 +18,7 @@ pub const LETTERS_VALUE: phf::Map<char, usize> = phf::phf_map! {
 };
 
 pub static BONUS_CELLS: phf::Map<&'static str, &'static [(usize, usize)]> = phf_map! {
+    // Bonus cells placement
     "LCD" => &[(0, 3), (2, 6), (3, 0), (3, 7), (6, 2), (6, 6), (7, 3)],
     "LCT" => &[(1, 5), (5, 1), (5, 5)],
     "LCQ" => &[],
