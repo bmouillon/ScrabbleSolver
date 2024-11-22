@@ -265,12 +265,12 @@ pub fn filter_valid_words(wordinfos: Vec<WordInfo>) -> Vec<ValidWord> {
         .collect()
 }
 
-pub fn generate_horizontal_words(
+pub fn generate_solutions(
     grid: &Grid,
     rack: &HashMap<char, usize>,
     gaddag: &GaddagNode,
 ) -> Vec<ValidWord> {
-    // Renvoie tous les mots horizontaux jouables sur la grille
+    // Renvoie toutes les solutions jouables sur la grille
     let mut valid_words = Vec::new();
     for i in 0..GRID_SIZE {
         for j in 0..GRID_SIZE {
@@ -279,6 +279,22 @@ pub fn generate_horizontal_words(
                 let valid_left_parts = filter_left_parts(left_parts);
                 let right_parts = generate_right_parts(i, j, grid, valid_left_parts);
                 let valid_right_parts = filter_valid_words(right_parts);
+                valid_words.extend(valid_right_parts);
+            }
+        }
+    }
+    let transposed_grid = Grid::transpose_grid(grid, gaddag);
+    for i in 0..GRID_SIZE {
+        for j in 0..GRID_SIZE {
+            if transposed_grid.anchors[i][j] {
+                let left_parts = generate_left_parts(i, j, &transposed_grid, rack, gaddag);
+                let valid_left_parts = filter_left_parts(left_parts);
+                let right_parts = generate_right_parts(i, j, &transposed_grid, valid_left_parts);
+                let mut valid_right_parts = filter_valid_words(right_parts);
+                // On doit inverser la référence comme on est dans la grille transposée
+                valid_right_parts
+                    .iter_mut()
+                    .for_each(|word| word.position = (word.position.1, word.position.0));
                 valid_words.extend(valid_right_parts);
             }
         }

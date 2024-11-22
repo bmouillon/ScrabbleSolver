@@ -9,7 +9,7 @@ use grid::Grid;
 use grid::Square;
 
 mod solver;
-use crate::solver::generate_horizontal_words;
+use crate::solver::generate_solutions;
 
 mod constants;
 
@@ -49,8 +49,10 @@ fn main() -> io::Result<()> {
         .iter()
         .cloned()
         .collect();
-    let valid_words = generate_horizontal_words(&grid, &rack, &gaddag);
-    for validword in valid_words {
+    let mut valid_words = generate_solutions(&grid, &rack, &gaddag);
+    valid_words.sort_by(|a, b| b.score.cmp(&a.score));
+    println!("Number of solutions: {}", valid_words.len());
+    for validword in valid_words.iter().take(10) {
         println!(
             "Position: {:?}, Word: {}, Rack: {:?}, Score: {}",
             validword.position, validword.word, validword.rack, validword.score

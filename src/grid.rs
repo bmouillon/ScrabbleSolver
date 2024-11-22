@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Rc;
 
 use crate::constants::{ALPHABET, BONUS_CELLS, GRID_SIZE, LETTERS_VALUE};
 use crate::gaddag::{Gaddag, GaddagNode};
@@ -33,12 +32,18 @@ impl Grid {
         }
     }
 
-    // pub fn get_letter(&self, row: usize, col: usize) -> Option<char> {
-    //     match self.squares[row][col] {
-    //         Square::Letter(c) => Some(c),
-    //         _ => None,
-    //     }
-    // }
+    pub fn transpose_grid(&self, gaddag: &GaddagNode) -> Grid {
+        // Renvoie une copie transposée de la grille
+        let mut transposed_grid = Self::new();
+        for i in 0..GRID_SIZE {
+            for j in 0..GRID_SIZE {
+                transposed_grid.squares[j][i] = self.squares[i][j];
+            }
+        }
+        transposed_grid.update_anchors();
+        transposed_grid.update_crosswords(gaddag);
+        transposed_grid
+    }
 
     fn set_bonus(&mut self, bonus: Square, idx_list: &[(usize, usize)]) {
         let n = GRID_SIZE - 1;
@@ -60,7 +65,6 @@ impl Grid {
             ("MCT", Square::MCT),
             ("MCQ", Square::MCQ),
         ];
-
         for (str_bonus, bonus) in bonuses {
             if let Some(idx_list) = BONUS_CELLS.get(str_bonus) {
                 self.set_bonus(bonus, idx_list);
@@ -69,6 +73,7 @@ impl Grid {
     }
 
     pub fn get_square_multiplier(&self, x: usize, y: usize) -> (usize, usize) {
+        // Retourne le bonus sur la case (i, j)
         match self.squares[x][y] {
             Square::Blank => (1, 1),
             Square::LCD => (2, 1),
@@ -81,14 +86,14 @@ impl Grid {
         }
     }
 
-    pub fn play(&mut self, word: &str, i: usize, j: usize, direction: usize, gaddag: GaddagNode) {
+    pub fn play(&mut self, word: &str, i: usize, j: usize, direction: usize, gaddag: &GaddagNode) {
         if direction == 0 {
-            // Horizontal play
+            // Mot horizontal
             for (k, c) in word.chars().enumerate() {
                 self.squares[i][j + k] = Square::Letter(c);
             }
         } else {
-            // Vertical play
+            // Mot vertical
             for (k, c) in word.chars().enumerate() {
                 self.squares[i + k][j] = Square::Letter(c);
             }
@@ -120,7 +125,7 @@ impl Grid {
             }
         }
         if self.anchors.iter().all(|row| row.iter().all(|&a| !a)) {
-            self.anchors[7][7] = true; // Activer l'ancre au centre si la grille est vide
+            self.anchors[7][7] = true; // Activation de l'ancre centrale si la grille est vide
         }
     }
 
@@ -175,11 +180,11 @@ impl Grid {
                             }
                         }
                         if let Some(entry) = &mut self.crosswords[x][y] {
-                            // On doit insérer le joker si il existe au moins un crossword possible
+                            // Insertion du joker s'il existe au moins un crossword possible
                             let jok_cw_score = score * mult;
                             entry.insert('?', jok_cw_score);
                         } else {
-                            // Sinon on doit initialiser avec une HashMap vide
+                            // Sinon on initialise avec une HashMap vide
                             self.crosswords[x][y] = Some(HashMap::new());
                         }
                     }
@@ -207,7 +212,6 @@ impl fmt::Display for Grid {
             }
             writeln!(f)?;
         }
-
         // Print the anchors
         writeln!(f, "\nAnchors:")?;
         for i in 0..self.anchors.len() {
@@ -217,7 +221,6 @@ impl fmt::Display for Grid {
             }
             writeln!(f)?;
         }
-
         // Print the crosswords
         writeln!(f, "\nCrosswords:")?;
         for row in &self.crosswords {
