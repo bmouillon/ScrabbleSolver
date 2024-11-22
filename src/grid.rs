@@ -165,7 +165,7 @@ impl Grid {
                         let (flat, mult) = self.get_square_multiplier(x, y);
                         for &c in &ALPHABET {
                             let word = format!("{}{}!{}", c, up_letters, down_letters);
-                            if Gaddag::contains_word(&word, Rc::clone(&gaddag)) {
+                            if Gaddag::contains_word(&word, gaddag) {
                                 // Calcul du score du crossword
                                 let letter_score = *LETTERS_VALUE.get(&c).unwrap_or(&0);
                                 let cw_score = (letter_score * flat + score) * mult;
