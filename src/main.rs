@@ -9,10 +9,7 @@ use grid::Grid;
 use grid::Square;
 
 mod solver;
-use crate::solver::filter_left_parts;
-use crate::solver::filter_valid_words;
-use crate::solver::generate_left_parts;
-use crate::solver::generate_right_parts;
+use crate::solver::generate_horizontal_words;
 
 mod constants;
 
@@ -52,10 +49,7 @@ fn main() -> io::Result<()> {
         .iter()
         .cloned()
         .collect();
-    let left_parts = generate_left_parts(2, 5, &grid, &rack, &gaddag);
-    let filtered_left_parts = filter_left_parts(left_parts);
-    let right_parts = generate_right_parts(2, 5, &grid, filtered_left_parts);
-    let valid_words = filter_valid_words(right_parts);
+    let valid_words = generate_horizontal_words(&grid, &rack, &gaddag);
     for validword in valid_words {
         println!(
             "Position: {:?}, Word: {}, Rack: {:?}, Score: {}",

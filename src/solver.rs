@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -67,7 +68,7 @@ fn process_letter(
         let new_multiplier = wordinfo.score.1 * square_mult;
         // Retourne le nouveau WordInfo
         return Some(WordInfo {
-            position: wordinfo.position,
+            position: (i, min(wordinfo.position.1, j)),
             rack: new_rack,
             prefix: new_prefix,
             score: (new_flat_score, new_multiplier, new_cw_score),
@@ -130,7 +131,7 @@ pub fn handle_left_part(
         if let Some(node) = Gaddag::follow_path(gaddag, &path) {
             let flat_score = left_score + *LETTERS_VALUE.get(&c).unwrap_or(&0) * square_flat;
             results.push(WordInfo {
-                position: (i, j),
+                position: (i, k),
                 rack: reduce_rack(rack, c),
                 prefix: path,
                 score: (flat_score, square_mult, cw_score),
@@ -150,8 +151,10 @@ pub fn generate_left_parts(
 ) -> Vec<WordInfo> {
     // Retourne l'ensemble des préfixes gauches à partir de (i, j)
     // Vérification de la présence d'une lettre à gauche de l'ancre
-    if let Square::Letter(_) = grid.squares[i][j - 1] {
-        return handle_left_part(i, j, grid, rack, gaddag);
+    if j > 0 {
+        if let Square::Letter(_) = grid.squares[i][j - 1] {
+            return handle_left_part(i, j, grid, rack, gaddag);
+        }
     }
     // Recherche de la place disponible à gauche de l'ancre
     let mut left_limit = j;
@@ -260,4 +263,25 @@ pub fn filter_valid_words(wordinfos: Vec<WordInfo>) -> Vec<ValidWord> {
             }
         })
         .collect()
+}
+
+pub fn generate_horizontal_words(
+    grid: &Grid,
+    rack: &HashMap<char, usize>,
+    gaddag: &GaddagNode,
+) -> Vec<ValidWord> {
+    // Renvoie tous les mots horizontaux jouables sur la grille
+    let mut valid_words = Vec::new();
+    for i in 0..GRID_SIZE {
+        for j in 0..GRID_SIZE {
+            if grid.anchors[i][j] {
+                let left_parts = generate_left_parts(i, j, grid, rack, gaddag);
+                let valid_left_parts = filter_left_parts(left_parts);
+                let right_parts = generate_right_parts(i, j, grid, valid_left_parts);
+                let valid_right_parts = filter_valid_words(right_parts);
+                valid_words.extend(valid_right_parts);
+            }
+        }
+    }
+    valid_words
 }
