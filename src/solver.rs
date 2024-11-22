@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::constants::LETTERS_VALUE;
+use crate::constants::{GRID_SIZE, LETTERS_VALUE};
 use crate::gaddag::{Gaddag, GaddagNode};
 use crate::grid::{Grid, Square};
 
@@ -11,6 +11,13 @@ pub struct WordInfo {
     pub prefix: String,
     pub score: (usize, usize, usize),
     pub node: GaddagNode,
+}
+
+pub struct ValidWord {
+    pub position: (usize, usize),
+    pub rack: HashMap<char, usize>,
+    pub word: String,
+    pub score: usize,
 }
 
 fn reduce_rack(rack: &HashMap<char, usize>, letter: char) -> HashMap<char, usize> {
@@ -34,43 +41,38 @@ fn process_letter(
     letter: char,
     replacement: char,
 ) -> Option<WordInfo> {
+    // Remplacement sert pour le joker
     if let Some(next_node) = wordinfo.node.borrow().children.get(&replacement) {
         // Vérifie si on ne forme pas un crossword invalide
-        if grid.crosswords[i][j]
-            .as_ref()
-            .map_or(true, |cw| cw.contains_key(&replacement))
-        {
-            // Génère la nouvelle rack et le nouveau prefix
-            let new_rack = reduce_rack(&wordinfo.rack, letter);
-            let mut new_prefix = wordinfo.prefix.clone();
-            new_prefix.push(if letter == '?' {
-                replacement.to_ascii_lowercase()
+        let mut new_cw_score = wordinfo.score.2;
+        if let Some(cw) = &grid.crosswords[i][j] {
+            if let Some(cw_value) = cw.get(&letter) {
+                new_cw_score += cw_value;
             } else {
-                replacement
-            });
-            // Mise à jour des scores
-            let (square_flat, square_mult) = grid.get_square_multiplier(i, j);
-            let new_flat_score =
-                wordinfo.score.0 + LETTERS_VALUE.get(&replacement).unwrap_or(&0) * square_flat;
-            let new_multiplier = wordinfo.score.1 * square_mult;
-            // Calcul du nouveau score des crosswords
-            let new_cw_score = if let Some(cw) = &grid.crosswords[i][j] {
-                if let Some(cw_value) = cw.get(&replacement) {
-                    wordinfo.score.2 + cw_value
-                } else {
-                    wordinfo.score.2
-                }
-            } else {
-                wordinfo.score.2
-            };
-            return Some(WordInfo {
-                position: wordinfo.position,
-                rack: new_rack,
-                prefix: new_prefix,
-                score: (new_flat_score, new_multiplier, new_cw_score),
-                node: Rc::clone(&next_node),
-            });
+                return None;
+            }
         }
+        // Génère la nouvelle rack et le nouveau prefix
+        let new_rack = reduce_rack(&wordinfo.rack, letter);
+        let mut new_prefix = wordinfo.prefix.clone();
+        new_prefix.push(if letter == '?' {
+            replacement.to_ascii_lowercase()
+        } else {
+            letter
+        });
+        // Mise à jour des scores
+        let (square_flat, square_mult) = grid.get_square_multiplier(i, j);
+        let new_flat_score =
+            wordinfo.score.0 + LETTERS_VALUE.get(&letter).unwrap_or(&0) * square_flat;
+        let new_multiplier = wordinfo.score.1 * square_mult;
+        // Retourne le nouveau WordInfo
+        return Some(WordInfo {
+            position: wordinfo.position,
+            rack: new_rack,
+            prefix: new_prefix,
+            score: (new_flat_score, new_multiplier, new_cw_score),
+            node: Rc::clone(next_node),
+        });
     }
     None
 }
@@ -176,26 +178,86 @@ pub fn generate_left_parts(
         }
         current_prefixes = std::mem::take(&mut next_prefixes);
     }
+    // Sauvegarde de la dernière itération
     all_results.extend(current_prefixes);
     all_results
 }
 
-pub fn filter_left_parts(results: Vec<WordInfo>) -> Vec<WordInfo> {
+pub fn filter_left_parts(wordinfos: Vec<WordInfo>) -> Vec<WordInfo> {
     // Filtre les préfixes gauches obtenus en ne gardant que ceux qui peuvent être le début d'un mot
-    let mut filtered_results = Vec::new();
-    for wordinfo in results {
+    let mut filtered_wordinfos = Vec::new();
+    for wordinfo in wordinfos {
         if let Some(bang_node) = wordinfo.node.borrow().children.get(&'!') {
             // Renversement du préfixe
             let reversed_prefix = wordinfo.prefix.chars().rev().collect();
             // Ajout du résultat modifié à la liste filtrée
-            filtered_results.push(WordInfo {
-                position: wordinfo.position,
-                rack: wordinfo.rack,
+            filtered_wordinfos.push(WordInfo {
                 prefix: reversed_prefix,
-                score: wordinfo.score,
                 node: Rc::clone(bang_node),
+                ..wordinfo
             });
         }
     }
-    filtered_results
+    filtered_wordinfos
+}
+
+pub fn generate_right_parts(
+    i: usize,
+    j: usize,
+    grid: &Grid,
+    wordinfos: Vec<WordInfo>,
+) -> Vec<WordInfo> {
+    let mut current_wordinfos = wordinfos;
+    let mut next_wordinfos = Vec::new();
+    let mut all_results = Vec::new();
+    let mut y = j + 1;
+    while y < GRID_SIZE {
+        if let Square::Letter(letter) = grid.squares[i][y] {
+            // Si la case suivante contient une lettre on essaie de l'ajouter à chaque WordInfo
+            for wordinfo in current_wordinfos {
+                if let Some(next_node) = wordinfo.node.borrow().children.get(&letter) {
+                    let mut new_prefix = wordinfo.prefix.clone();
+                    new_prefix.push(letter);
+                    let new_flat_score =
+                        wordinfo.score.0 + LETTERS_VALUE.get(&letter).unwrap_or(&0);
+                    next_wordinfos.push(WordInfo {
+                        prefix: new_prefix,
+                        score: (new_flat_score, wordinfo.score.1, wordinfo.score.2),
+                        node: Rc::clone(next_node),
+                        ..wordinfo
+                    });
+                }
+            }
+        } else {
+            // Si la case suivante ne possède pas de lettre on applique step à chaque WordInfo
+            for wordinfo in current_wordinfos.drain(..) {
+                let results = step(i, y, grid, &wordinfo);
+                for result in results {
+                    next_wordinfos.push(result);
+                }
+                all_results.push(wordinfo);
+            }
+        }
+        current_wordinfos = std::mem::take(&mut next_wordinfos);
+        y += 1;
+    }
+    all_results.extend(current_wordinfos);
+    all_results
+}
+
+pub fn filter_valid_words(wordinfos: Vec<WordInfo>) -> Vec<ValidWord> {
+    // Ne retourne que les WordInfo qui sont des mots valides, et calcule leur score
+    wordinfos
+        .into_iter()
+        .filter(|wi| wi.node.borrow().is_word)
+        .map(|wi| {
+            let final_score = wi.score.0 * wi.score.1 + wi.score.2;
+            ValidWord {
+                position: wi.position,
+                rack: wi.rack,
+                word: wi.prefix,
+                score: final_score,
+            }
+        })
+        .collect()
 }

@@ -10,8 +10,9 @@ use grid::Square;
 
 mod solver;
 use crate::solver::filter_left_parts;
+use crate::solver::filter_valid_words;
 use crate::solver::generate_left_parts;
-use solver::WordInfo;
+use crate::solver::generate_right_parts;
 
 mod constants;
 
@@ -47,38 +48,20 @@ fn main() -> io::Result<()> {
     grid.update_crosswords(&gaddag);
     println!("{}", grid);
 
-    let rack: HashMap<char, usize> = [('A', 2), ('F', 1), ('I', 1), ('L', 2), ('X', 1)]
+    let rack: HashMap<char, usize> = [('A', 2), ('E', 1), ('F', 1), ('L', 2), ('O', 1)]
         .iter()
         .cloned()
         .collect();
-    let results = generate_left_parts(2, 5, &grid, &rack, &gaddag);
-    let filtered_results = filter_left_parts(results);
-    for wordinfo in filtered_results {
+    let left_parts = generate_left_parts(2, 5, &grid, &rack, &gaddag);
+    let filtered_left_parts = filter_left_parts(left_parts);
+    let right_parts = generate_right_parts(2, 5, &grid, filtered_left_parts);
+    let valid_words = filter_valid_words(right_parts);
+    for validword in valid_words {
         println!(
-            "Prefix: {}, Rack: {:?}, Flat Score: {}, Multiplier: {}, CW Score: {}",
-            wordinfo.prefix, wordinfo.rack, wordinfo.score.0, wordinfo.score.1, wordinfo.score.2
+            "Position: {:?}, Word: {}, Rack: {:?}, Score: {}",
+            validword.position, validword.word, validword.rack, validword.score
         );
     }
-
-    // // Vérifier si la string "UOF!DRE" est dans le GADDAG
-    // let word_to_check = "!FOUDRE";
-    // if Tree::contains_word(word_to_check, Rc::clone(&root)) {
-    //     println!("The word '{}' is in the GADDAG!", word_to_check);
-    // } else {
-    //     println!("The word '{}' is NOT in the GADDAG.", word_to_check);
-    // }
-
-    // // Initialize the grid
-    // let mut grid = Grid::new();
-
-    // // Generate the grid
-    // grid.generate_grid();
-
-    // // Update anchors based on the current grid state
-    // grid.update_anchors();
-
-    // // Print the grid and anchors
-    // println!("{}", grid);
 
     Ok(())
 }
