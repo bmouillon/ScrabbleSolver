@@ -92,6 +92,53 @@ fn step(i: usize, j: usize, grid: &Grid, wordinfo: &WordInfo) -> Vec<WordInfo> {
     results
 }
 
+pub fn handle_left_part(
+    i: usize,
+    j: usize,
+    grid: &Grid,
+    rack: &HashMap<char, usize>,
+    gaddag: &GaddagNode,
+) -> Vec<WordInfo> {
+    // Récupère le préfixe à gauche de l'ancre
+    let mut left_prefix = String::new();
+    let mut left_score = 0;
+    let mut k = j;
+    while k > 0 {
+        if let Square::Letter(letter) = grid.squares[i][k - 1] {
+            left_prefix.push(letter);
+            left_score += *LETTERS_VALUE.get(&letter).unwrap_or(&0);
+            k -= 1;
+        } else {
+            break;
+        }
+    }
+    let (square_flat, square_mult) = grid.get_square_multiplier(i, j);
+    // Construit les préfixes valides
+    let mut results = Vec::new();
+    for (&c, _) in rack.iter() {
+        let mut cw_score = 0;
+        if let Some(crossword) = &grid.crosswords[i][j] {
+            if let Some(&cw_value) = crossword.get(&c) {
+                cw_score = cw_value;
+            } else {
+                continue;
+            }
+        }
+        let path = format!("{}{}", c, left_prefix);
+        if let Some(node) = Gaddag::follow_path(gaddag, &path) {
+            let flat_score = left_score + *LETTERS_VALUE.get(&c).unwrap_or(&0) * square_flat;
+            results.push(WordInfo {
+                position: (i, j),
+                rack: reduce_rack(rack, c),
+                prefix: path,
+                score: (flat_score, square_mult, cw_score),
+                node,
+            });
+        }
+    }
+    results
+}
+
 pub fn generate_left_parts(
     i: usize,
     j: usize,
@@ -101,10 +148,8 @@ pub fn generate_left_parts(
 ) -> Vec<WordInfo> {
     // Retourne l'ensemble des préfixes gauches à partir de (i, j)
     // Vérification de la présence d'une lettre à gauche de l'ancre
-    if j == 0 {
-        return Vec::new(); // TO DO
-    } else if let Square::Letter(_) = grid.squares[i][j - 1] {
-        return Vec::new(); // TO DO
+    if let Square::Letter(_) = grid.squares[i][j - 1] {
+        return handle_left_part(i, j, grid, rack, gaddag);
     }
     // Recherche de la place disponible à gauche de l'ancre
     let mut left_limit = j;
