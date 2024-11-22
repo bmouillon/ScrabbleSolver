@@ -22,6 +22,7 @@ impl Gaddag {
     }
 
     fn insert_into_gaddag(word: &[char], gaddag: GaddagNode) {
+        // Insère la séquence word dans le gaddag
         let mut gaddag = gaddag.borrow_mut();
         if word.is_empty() {
             gaddag.is_word = true;
@@ -37,6 +38,7 @@ impl Gaddag {
     }
 
     fn generate_permutations(word: &str, gaddag: GaddagNode) {
+        // Génère toutes les permutations de word à insérer dans le gaddag
         for i in 0..word.len() {
             let mut w: Vec<char> = Vec::new();
             for j in (0..=i).rev() {
@@ -50,39 +52,41 @@ impl Gaddag {
         }
     }
 
-    pub fn contains_word(word: &str, gaddag: GaddagNode) -> bool {
-        let mut current_node = Rc::clone(&gaddag);
-
-        for c in word.chars() {
-            let next_node_opt = {
-                let node = current_node.borrow();
-                node.children.get(&c).map(Rc::clone)
-            };
-
-            match next_node_opt {
-                Some(next_node) => {
-                    current_node = next_node;
-                }
-                None => return false,
+    pub fn follow_path(node: &GaddagNode, path: &str) -> Option<GaddagNode> {
+        // Retourne le noeud en partant de node et en suivant path
+        let mut current_node = Rc::clone(node);
+        for c in path.chars() {
+            let next_node = current_node.borrow().children.get(&c).cloned();
+            match next_node {
+                Some(next_node) => current_node = next_node,
+                None => return None,
             }
         }
+        Some(current_node)
+    }
 
-        let is_word = current_node.borrow().is_word;
-        is_word
+    pub fn contains_word(word: &str, gaddag: &GaddagNode) -> bool {
+        // Vérifie si word est un mot valide du gaddag
+        if let Some(final_node) = Gaddag::follow_path(gaddag, word) {
+            final_node.borrow().is_word
+        } else {
+            false
+        }
     }
 
     pub fn read_words_from_file(filename: &str) -> Rc<RefCell<Gaddag>> {
+        // Crée un nouveau gaddag qui contient tous les mots présents dans filename
         let path = Path::new(filename);
         let file = match File::open(&path) {
             Ok(f) => f,
             Err(_) => {
                 println!("Error opening file: {}", filename);
-                return Gaddag::new(); // Return an empty GADDAG if file can't be opened
+                return Gaddag::new();
             }
         };
         let reader = io::BufReader::new(file);
         let gaddag = Gaddag::new();
-
+        // Chaque ligne correspond à un mot
         for line in reader.lines() {
             match line {
                 Ok(word) => {
@@ -90,7 +94,7 @@ impl Gaddag {
                 }
                 Err(_) => {
                     println!("Error reading a line from file: {}", filename);
-                    return Gaddag::new(); // Return an empty GADDAG in case of read error
+                    return Gaddag::new();
                 }
             }
         }
