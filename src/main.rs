@@ -45,10 +45,18 @@ fn main() -> io::Result<()> {
     grid.update_crosswords(&gaddag);
     println!("{}", grid);
 
-    let rack: HashMap<char, usize> = [('A', 2), ('E', 1), ('F', 1), ('L', 2), ('O', 1)]
-        .iter()
-        .cloned()
-        .collect();
+    let rack: HashMap<char, usize> = [
+        ('A', 1),
+        ('F', 1),
+        ('I', 1),
+        ('M', 1),
+        ('N', 1),
+        ('U', 1),
+        ('?', 1),
+    ]
+    .iter()
+    .cloned()
+    .collect();
     let mut valid_words = generate_solutions(&grid, &rack, &gaddag);
     valid_words.sort_by(|a, b| b.score.cmp(&a.score));
     println!("Number of solutions: {}", valid_words.len());

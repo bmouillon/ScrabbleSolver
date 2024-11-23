@@ -2,7 +2,7 @@ use std::cmp::min;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::constants::{GRID_SIZE, LETTERS_VALUE};
+use crate::constants::{BINGOS_BONUS, GRID_SIZE, LETTERS_VALUE};
 use crate::gaddag::{Gaddag, GaddagNode};
 use crate::grid::{Grid, Square};
 
@@ -11,6 +11,7 @@ pub struct WordInfo {
     pub rack: HashMap<char, usize>,
     pub prefix: String,
     pub score: (usize, usize, usize),
+    pub letters_nb: u8,
     pub node: GaddagNode,
 }
 
@@ -47,8 +48,12 @@ fn process_letter(
         // Vérifie si on ne forme pas un crossword invalide
         let mut new_cw_score = wordinfo.score.2;
         if let Some(cw) = &grid.crosswords[i][j] {
-            if let Some(cw_value) = cw.get(&letter) {
-                new_cw_score += cw_value;
+            if let Some(cw_value) = cw.get(&replacement) {
+                if letter == '?' {
+                    new_cw_score += cw.get(&letter).unwrap_or(&0);
+                } else {
+                    new_cw_score += cw_value;
+                }
             } else {
                 return None;
             }
@@ -72,6 +77,7 @@ fn process_letter(
             rack: new_rack,
             prefix: new_prefix,
             score: (new_flat_score, new_multiplier, new_cw_score),
+            letters_nb: wordinfo.letters_nb + 1,
             node: Rc::clone(next_node),
         });
     }
@@ -99,8 +105,7 @@ pub fn handle_left_part(
     i: usize,
     j: usize,
     grid: &Grid,
-    rack: &HashMap<char, usize>,
-    gaddag: &GaddagNode,
+    wordinfos: Vec<WordInfo>,
 ) -> Vec<WordInfo> {
     // Récupère le préfixe à gauche de l'ancre
     let mut left_prefix = String::new();
@@ -115,27 +120,18 @@ pub fn handle_left_part(
             break;
         }
     }
-    let (square_flat, square_mult) = grid.get_square_multiplier(i, j);
     // Construit les préfixes valides
     let mut results = Vec::new();
-    for (&c, _) in rack.iter() {
-        let mut cw_score = 0;
-        if let Some(crossword) = &grid.crosswords[i][j] {
-            if let Some(&cw_value) = crossword.get(&c) {
-                cw_score = cw_value;
-            } else {
-                continue;
-            }
-        }
-        let path = format!("{}{}", c, left_prefix);
-        if let Some(node) = Gaddag::follow_path(gaddag, &path) {
-            let flat_score = left_score + *LETTERS_VALUE.get(&c).unwrap_or(&0) * square_flat;
+    for wordinfo in wordinfos {
+        if let Some(node) = Gaddag::follow_path(&wordinfo.node, &left_prefix) {
+            let new_prefix = format!("{}{}", wordinfo.prefix, left_prefix);
+            let new_flat_score = wordinfo.score.0 + left_score;
             results.push(WordInfo {
                 position: (i, k),
-                rack: reduce_rack(rack, c),
-                prefix: path,
-                score: (flat_score, square_mult, cw_score),
-                node,
+                prefix: new_prefix,
+                score: (new_flat_score, wordinfo.score.1, wordinfo.score.2),
+                node: node,
+                ..wordinfo
             });
         }
     }
@@ -150,10 +146,19 @@ pub fn generate_left_parts(
     gaddag: &GaddagNode,
 ) -> Vec<WordInfo> {
     // Retourne l'ensemble des préfixes gauches à partir de (i, j)
+    let empty_wordinfo = WordInfo {
+        position: (i, j),
+        rack: rack.clone(),
+        prefix: String::new(),
+        score: (0, 1, 0),
+        letters_nb: 0,
+        node: Rc::clone(gaddag),
+    };
     // Vérification de la présence d'une lettre à gauche de l'ancre
     if j > 0 {
         if let Square::Letter(_) = grid.squares[i][j - 1] {
-            return handle_left_part(i, j, grid, rack, gaddag);
+            let current_wordinfos = step(i, j, grid, &empty_wordinfo);
+            return handle_left_part(i, j, grid, current_wordinfos);
         }
     }
     // Recherche de la place disponible à gauche de l'ancre
@@ -163,13 +168,7 @@ pub fn generate_left_parts(
     }
     // Génération des préfixes
     let mut all_results = Vec::new();
-    let mut current_prefixes = vec![WordInfo {
-        position: (i, j),
-        rack: rack.clone(),
-        prefix: String::new(),
-        score: (0, 1, 0),
-        node: Rc::clone(gaddag),
-    }];
+    let mut current_prefixes = vec![empty_wordinfo];
     let mut next_prefixes = Vec::new();
     for k in (left_limit..=j).rev() {
         for wordinfo in current_prefixes.drain(..) {
@@ -222,7 +221,7 @@ pub fn generate_right_parts(
                     let mut new_prefix = wordinfo.prefix.clone();
                     new_prefix.push(letter);
                     let new_flat_score =
-                        wordinfo.score.0 + LETTERS_VALUE.get(&letter).unwrap_or(&0);
+                        wordinfo.score.0 + *LETTERS_VALUE.get(&letter).unwrap_or(&0);
                     next_wordinfos.push(WordInfo {
                         prefix: new_prefix,
                         score: (new_flat_score, wordinfo.score.1, wordinfo.score.2),
@@ -254,7 +253,8 @@ pub fn filter_valid_words(wordinfos: Vec<WordInfo>) -> Vec<ValidWord> {
         .into_iter()
         .filter(|wi| wi.node.borrow().is_word)
         .map(|wi| {
-            let final_score = wi.score.0 * wi.score.1 + wi.score.2;
+            let bonus = *BINGOS_BONUS.get(&wi.letters_nb).unwrap_or(&0);
+            let final_score = wi.score.0 * wi.score.1 + wi.score.2 + bonus;
             ValidWord {
                 position: wi.position,
                 rack: wi.rack,
