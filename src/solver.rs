@@ -16,7 +16,7 @@ pub struct WordInfo {
 }
 
 pub struct ValidWord {
-    pub position: (usize, usize),
+    pub position: String,
     pub rack: HashMap<char, usize>,
     pub word: String,
     pub score: usize,
@@ -217,7 +217,12 @@ pub fn generate_right_parts(
         if let Square::Letter(letter) = grid.squares[i][y] {
             // Si la case suivante contient une lettre on essaie de l'ajouter à chaque WordInfo
             for wordinfo in current_wordinfos {
-                if let Some(next_node) = wordinfo.node.borrow().children.get(&letter) {
+                if let Some(next_node) = wordinfo
+                    .node
+                    .borrow()
+                    .children
+                    .get(&letter.to_ascii_uppercase())
+                {
                     let mut new_prefix = wordinfo.prefix.clone();
                     new_prefix.push(letter);
                     let new_flat_score =
@@ -247,7 +252,7 @@ pub fn generate_right_parts(
     all_results
 }
 
-pub fn filter_valid_words(wordinfos: Vec<WordInfo>) -> Vec<ValidWord> {
+pub fn filter_valid_words(wordinfos: Vec<WordInfo>, direction: bool) -> Vec<ValidWord> {
     // Ne retourne que les WordInfo qui sont des mots valides, et calcule leur score
     wordinfos
         .into_iter()
@@ -256,7 +261,7 @@ pub fn filter_valid_words(wordinfos: Vec<WordInfo>) -> Vec<ValidWord> {
             let bonus = *BINGOS_BONUS.get(&wi.letters_nb).unwrap_or(&0);
             let final_score = wi.score.0 * wi.score.1 + wi.score.2 + bonus;
             ValidWord {
-                position: wi.position,
+                position: Grid::pos_to_ref(wi.position, direction),
                 rack: wi.rack,
                 word: wi.prefix,
                 score: final_score,
@@ -278,7 +283,7 @@ pub fn generate_solutions(
                 let left_parts = generate_left_parts(i, j, grid, rack, gaddag);
                 let valid_left_parts = filter_left_parts(left_parts);
                 let right_parts = generate_right_parts(i, j, grid, valid_left_parts);
-                let valid_right_parts = filter_valid_words(right_parts);
+                let valid_right_parts = filter_valid_words(right_parts, true);
                 valid_words.extend(valid_right_parts);
             }
         }
@@ -290,11 +295,7 @@ pub fn generate_solutions(
                 let left_parts = generate_left_parts(i, j, &transposed_grid, rack, gaddag);
                 let valid_left_parts = filter_left_parts(left_parts);
                 let right_parts = generate_right_parts(i, j, &transposed_grid, valid_left_parts);
-                let mut valid_right_parts = filter_valid_words(right_parts);
-                // On doit inverser la référence comme on est dans la grille transposée
-                valid_right_parts
-                    .iter_mut()
-                    .for_each(|word| word.position = (word.position.1, word.position.0));
+                let valid_right_parts = filter_valid_words(right_parts, false);
                 valid_words.extend(valid_right_parts);
             }
         }
