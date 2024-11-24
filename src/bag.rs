@@ -121,7 +121,7 @@ impl Bag {
         }
         // Si il ne reste plus assez de lettres dans le sac, on les prend toutes
         if self.bag.len() <= lim - rack_len {
-            let (drawn_letters, _, _) = self.draw(lim - rack_len);
+            let (drawn_letters, _, _) = self.draw(self.bag.len());
             augment_rack(rack, drawn_letters);
             return true;
         }
