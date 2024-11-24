@@ -45,6 +45,58 @@ impl Grid {
         transposed_grid
     }
 
+    pub fn pos_to_ref(position: (usize, usize), direction: bool) -> String {
+        // Transforme une position en coordonnées
+        let (row, col) = position;
+        if direction {
+            let letter = (b'A' + row as u8) as char;
+            let number = col + 1;
+            format!("{}{}", letter, number)
+        } else {
+            let letter = (b'A' + col as u8) as char;
+            let number = row + 1;
+            format!("{}{}", number, letter)
+        }
+    }
+
+    pub fn ref_to_pos(reference: &str) -> ((usize, usize), bool) {
+        // Transforme des coordonnées en position
+        let chars: Vec<char> = reference.chars().collect();
+        let len = chars.len();
+        match len {
+            2 => {
+                if chars[0].is_ascii_alphabetic() && chars[1].is_ascii_digit() {
+                    let row = (chars[0] as usize) - 'A' as usize;
+                    let col = (chars[1] as usize) - '1' as usize;
+                    return ((row, col), true);
+                } else if chars[0].is_ascii_digit() && chars[1].is_ascii_alphabetic() {
+                    let row = (chars[1] as usize) - 'A' as usize;
+                    let col = (chars[0] as usize) - '1' as usize;
+                    return ((row, col), false);
+                }
+            }
+            3 => {
+                if chars[0].is_ascii_alphabetic()
+                    && chars[1].is_ascii_digit()
+                    && chars[2].is_ascii_digit()
+                {
+                    let row = (chars[0] as usize) - 'A' as usize;
+                    let col = reference[1..].parse::<usize>().unwrap_or(0) - 1;
+                    return ((row, col), true);
+                } else if chars[2].is_ascii_alphabetic()
+                    && chars[0].is_ascii_digit()
+                    && chars[1].is_ascii_digit()
+                {
+                    let row = (chars[2] as usize) - 'A' as usize;
+                    let col = reference[..2].parse::<usize>().unwrap_or(0) - 1;
+                    return ((row, col), false);
+                }
+            }
+            _ => {}
+        }
+        ((GRID_SIZE, GRID_SIZE), true)
+    }
+
     fn set_bonus(&mut self, bonus: Square, idx_list: &[(usize, usize)]) {
         let n = GRID_SIZE - 1;
         for (x, y) in idx_list {
@@ -56,7 +108,7 @@ impl Grid {
     }
 
     pub fn generate_grid(&mut self) {
-        // Place les cases bonus sur la grille
+        // Place les cases bonus sur la grille et l'ancre au centre
         let bonuses = [
             ("LCD", Square::LCD),
             ("LCT", Square::LCT),
@@ -70,6 +122,7 @@ impl Grid {
                 self.set_bonus(bonus, idx_list);
             }
         }
+        self.anchors[7][7] = true;
     }
 
     pub fn get_square_multiplier(&self, x: usize, y: usize) -> (usize, usize) {
@@ -86,8 +139,8 @@ impl Grid {
         }
     }
 
-    pub fn play(&mut self, word: &str, i: usize, j: usize, direction: usize, gaddag: &GaddagNode) {
-        if direction == 0 {
+    pub fn play(&mut self, word: &str, i: usize, j: usize, direction: bool, gaddag: &GaddagNode) {
+        if direction {
             // Mot horizontal
             for (k, c) in word.chars().enumerate() {
                 self.squares[i][j + k] = Square::Letter(c);
@@ -121,6 +174,8 @@ impl Grid {
                     let b3 = self.is_empty(i, j.wrapping_sub(1));
                     let b4 = self.is_empty(i, j + 1);
                     self.anchors[i][j] = !(b1 && b2 && b3 && b4);
+                } else {
+                    self.anchors[i][j] = false;
                 }
             }
         }
@@ -140,7 +195,7 @@ impl Grid {
             i -= 1;
             if let Square::Letter(c) = self.squares[i][y] {
                 score += *LETTERS_VALUE.get(&c).unwrap_or(&0);
-                up_letters.push(c);
+                up_letters.push(c.to_ascii_uppercase());
             } else {
                 break;
             }
@@ -151,7 +206,7 @@ impl Grid {
             i += 1;
             if let Square::Letter(c) = self.squares[i][y] {
                 score += *LETTERS_VALUE.get(&c).unwrap_or(&0);
-                down_letters.push(c);
+                down_letters.push(c.to_ascii_uppercase());
             } else {
                 break;
             }
