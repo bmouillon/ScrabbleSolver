@@ -26,7 +26,7 @@ fn augment_rack(rack: &mut HashMap<char, usize>, letters: Vec<char>) {
 }
 
 pub struct Bag {
-    pub bag: Vec<char>,
+    bag: Vec<char>,
     vowels_nb: usize,
     consonants_nb: usize,
 }
@@ -85,7 +85,7 @@ impl Bag {
             }
         }
         for (letter, count) in rack.drain() {
-            self.bag.push(letter);
+            self.bag.extend(std::iter::repeat(letter).take(count));
             if VOWELS.contains(&letter) {
                 self.vowels_nb += count;
             };
