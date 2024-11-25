@@ -1,13 +1,14 @@
 use std::collections::HashMap;
+use std::time::Instant;
 
 use crate::bag::Bag;
+use crate::gaddag::GaddagNode;
 use crate::solver::generate_solutions;
-use crate::Gaddag;
 use crate::Grid;
 
-pub fn generate_game() {
+pub fn generate_game(gaddag: &GaddagNode) {
     // Initialisation
-    let gaddag = Gaddag::read_words_from_file("ODS9.txt");
+    let start = Instant::now();
     let mut grid = Grid::new();
     Grid::generate_grid(&mut grid);
     let mut bag = Bag::new();
@@ -16,8 +17,7 @@ pub fn generate_game() {
     let mut min_vc = 2;
     // Génération
     while bag.valid_draw(&mut rack, 7, min_vc) {
-        println!("Rack: {:?}", rack);
-        println!("Remaining letters: {}", bag.bag.len());
+        println!("Move: {}, Rack: {:?}", moves_nb, rack);
         let mut valid_words = generate_solutions(&grid, &rack, &gaddag);
         valid_words.sort_by(|a, b| b.score.cmp(&a.score));
         let top = &valid_words[0];
@@ -33,4 +33,6 @@ pub fn generate_game() {
             min_vc = 1;
         }
     }
+    let duration = start.elapsed();
+    println!("Le temps d'exécution est de: {:?}", duration);
 }

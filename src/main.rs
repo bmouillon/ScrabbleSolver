@@ -19,7 +19,7 @@ mod generate;
 use crate::generate::generate_game;
 
 fn main() -> io::Result<()> {
-    // let gaddag = Gaddag::read_words_from_file("ODS9.txt");
+    let gaddag = Gaddag::read_words_from_file("ODS9.txt");
     // let mut grid = Grid::new();
     // Grid::generate_grid(&mut grid);
 
@@ -75,7 +75,7 @@ fn main() -> io::Result<()> {
     //     );
     // }
 
-    generate_game();
+    generate_game(&gaddag);
 
     Ok(())
 }
