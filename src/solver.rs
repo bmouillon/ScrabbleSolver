@@ -15,6 +15,7 @@ pub struct WordInfo {
     pub node: GaddagNode,
 }
 
+#[derive(Clone)]
 pub struct ValidWord {
     pub position: String,
     pub rack: HashMap<char, usize>,

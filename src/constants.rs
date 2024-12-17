@@ -1,6 +1,8 @@
 use phf::phf_map;
 
-pub const GRID_SIZE: usize = 15; // Size of the grid
+pub const FILENAME: &str = "ODS9.txt";
+
+pub const GRID_SIZE: usize = 15; // Taille de la grille
 
 pub const ALPHABET: [char; 26] = [
     // Alphabet
