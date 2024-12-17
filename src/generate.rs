@@ -25,26 +25,23 @@ pub fn choose_best_solution(valid_words: Vec<ValidWord>) -> ValidWord {
         );
     }
 
-    println!("Choisissez une solution:");
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input).unwrap();
-    let choice: usize = input.trim().parse().unwrap_or(1);
-
-    if choice > 0 && choice <= best_words.len() {
-        let solution = best_words[choice - 1].clone();
-        println!(
-            "Solution retenue: {} en {}\n",
-            solution.word, solution.position
-        );
-        return solution;
-    } else {
-        let solution = best_words[0].clone();
-        println!(
-            "Solution retenue: {} en {}\n",
-            solution.word, solution.position
-        );
-        return solution;
+    let mut choice: usize = 1;
+    if best_words.len() > 1 {
+        println!("Choisissez une solution:");
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
+        choice = input.trim().parse().unwrap_or(1);
+        if choice < 1 && choice > best_words.len() {
+            choice = 1;
+        }
     }
+
+    let solution = best_words[choice - 1].clone();
+    println!(
+        "Solution retenue: {} en {}\n",
+        solution.word, solution.position
+    );
+    return solution;
 }
 
 pub fn generate_game(gaddag: &GaddagNode) {
