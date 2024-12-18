@@ -1,6 +1,6 @@
 use phf::phf_map;
 
-pub const FILENAME: &str = "ODS9.txt";
+pub const FILENAME: &str = "ODS9.txt"; // Chemin vers le dictionnaire
 
 pub const GRID_SIZE: usize = 15; // Taille de la grille
 

@@ -39,14 +39,15 @@ impl Gaddag {
 
     fn generate_permutations(word: &str, gaddag: GaddagNode) {
         // Génère toutes les permutations de word à insérer dans le gaddag
-        for i in 0..word.len() {
+        let chars: Vec<char> = word.chars().collect();
+        for i in 0..chars.len() {
             let mut w: Vec<char> = Vec::new();
             for j in (0..=i).rev() {
-                w.push(word.chars().nth(j).unwrap());
+                w.push(chars[j]);
             }
             w.push('!');
-            for j in (i + 1)..word.len() {
-                w.push(word.chars().nth(j).unwrap());
+            for j in (i + 1)..chars.len() {
+                w.push(chars[j]);
             }
             Gaddag::insert_into_gaddag(&w, Rc::clone(&gaddag));
         }
