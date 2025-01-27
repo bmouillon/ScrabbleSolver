@@ -68,9 +68,9 @@ impl Bag {
         augment_rack(rack, drawn_letters);
     }
 
-    pub fn handle_draw(bag: &mut Bag, rack: &mut HashMap<char, usize>, lim: usize) {
+    pub fn handle_draw(&mut self, rack: &mut HashMap<char, usize>, lim: usize) {
         loop {
-            bag.valid_draw(rack, lim);
+            self.valid_draw(rack, lim);
             println!("Tirage actuel : {}", rack_to_string(rack));
             println!("Voulez-vous garder ce tirage ? (y/n)");
             let mut input = String::new();
@@ -80,8 +80,51 @@ impl Bag {
             if input == "y" {
                 break;
             } else {
-                bag.discard(rack);
+                self.discard(rack);
             }
         }
+    }
+
+    pub fn handle_manual_draw(
+        &mut self,
+        rack: &mut HashMap<char, usize>,
+        lim: usize,
+        input: String,
+    ) -> bool {
+        let current_count: usize = rack.values().sum();
+        let letters_needed = lim - current_count;
+        let input_letters: Vec<char> = input.chars().filter(|c| !c.is_whitespace()).collect();
+
+        if input == "-" {
+            self.discard(rack);
+            println!("Le tirage a été rejeté");
+            return false;
+        }
+
+        if input_letters.len() != letters_needed {
+            println!("Vous devez rentrer {} lettres", letters_needed);
+            return false;
+        }
+
+        // Vérification préalable des lettres disponibles dans le sac
+        let mut bag_copy = self.bag.clone();
+        for &letter in &input_letters {
+            if let Some(pos) = bag_copy.iter().position(|&c| c == letter) {
+                bag_copy.remove(pos);
+            } else {
+                println!("Lettre épuisée : '{}'", letter);
+                return false;
+            }
+        }
+
+        // Toutes les lettres sont disponibles, on procède aux modifications
+        for &letter in &input_letters {
+            if let Some(pos) = self.bag.iter().position(|&c| c == letter) {
+                self.bag.remove(pos);
+                *rack.entry(letter).or_insert(0) += 1;
+            }
+        }
+
+        true
     }
 }

@@ -52,7 +52,25 @@ pub fn generate_game(gaddag: &GaddagNode) {
     let mut rack = HashMap::new();
     // Génération
     while bag.bag.len() > 0 || !rack.is_empty() {
-        Bag::handle_draw(&mut bag, &mut rack, 7);
+        println!("Voulez-vous un tirage manuel ? (y/n)");
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
+        let input = input.trim();
+
+        if input == "y" {
+            let mut success = false;
+            while !success {
+                println!("Entrez les lettres que vous voulez ajouter au tirage ou - pour rejeter d'abord");
+                let mut letters_input = String::new();
+                std::io::stdin().read_line(&mut letters_input).unwrap();
+                let letters_input = letters_input.trim();
+                success =
+                    Bag::handle_manual_draw(&mut bag, &mut rack, 7, letters_input.to_string());
+            }
+        } else {
+            Bag::handle_draw(&mut bag, &mut rack, 7);
+        }
+
         let valid_words = generate_solutions(&grid, &rack, &gaddag);
         let top = choose_best_solution(valid_words);
         let ((i, j), direction) = Grid::ref_to_pos(&top.position);
